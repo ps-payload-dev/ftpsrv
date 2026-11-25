@@ -1,0 +1,13 @@
+PLATFORM := linux
+CC ?= cc
+PAYLOAD := build/linux/ftpsrv-posix.elf
+TARGETS := $(PAYLOAD)
+VERSION_TAG := $(shell git describe --abbrev=6 --dirty --always --tags)
+CFLAGS := -Wall -Werror -Iheaders -DVERSION_TAG=\"$(VERSION_TAG)\"
+SOURCE := cmd.c io.c notify.c self.c sha256.c srv.c
+SOURCE += cmd-linux.c io-linux.c main-linux.c self-linux.c
+
+include Makefile.build
+
+test: $(PAYLOAD)
+	./$<

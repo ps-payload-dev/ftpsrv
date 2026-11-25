@@ -1,0 +1,101 @@
+/* Copyright (C) 2023 John Törnblom
+   Copyright (C) 2026 ItsJokerZz
+
+This program is free software; you can redistribute it and/or modify it
+under the terms of the GNU General Public License as published by the
+Free Software Foundation; either version 3, or (at your option) any
+later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program; see the file COPYING. If not, see
+<http://www.gnu.org/licenses/>.  */
+
+#pragma once
+
+#include <limits.h>
+#include <netinet/in.h>
+#include <unistd.h>
+
+#define FTP_FACT_TYPE (1 << 0)
+#define FTP_FACT_SIZE (1 << 1)
+#define FTP_FACT_MODIFY (1 << 2)
+#define FTP_FACT_MODE (1 << 3)
+#define FTP_FACT_ALL                                                          \
+  (FTP_FACT_TYPE | FTP_FACT_SIZE | FTP_FACT_MODIFY | FTP_FACT_MODE)
+
+typedef struct ftp_env {
+  int data_fd;
+  int active_fd;
+  int passive_fd;
+  char cwd[PATH_MAX];
+
+  char type;
+  int self2elf;
+  off_t data_offset;
+  char rename_path[PATH_MAX];
+  struct sockaddr_in data_addr;
+  void *readbuf;
+  size_t readbuf_size;
+  char *linebuf;
+  unsigned mlst_facts;
+  int epsv_all;
+} ftp_env_t;
+
+typedef int(ftp_command_fn_t)(ftp_env_t *env, const char *arg);
+
+int ftp_cmd_ABOR(ftp_env_t *env, const char *arg);
+int ftp_cmd_APPE(ftp_env_t *env, const char *arg);
+int ftp_cmd_CDUP(ftp_env_t *env, const char *arg);
+int ftp_cmd_CWD(ftp_env_t *env, const char *arg);
+int ftp_cmd_DELE(ftp_env_t *env, const char *arg);
+int ftp_cmd_EPRT(ftp_env_t *env, const char *arg);
+int ftp_cmd_EPSV(ftp_env_t *env, const char *arg);
+int ftp_cmd_FEAT(ftp_env_t *env, const char *arg);
+int ftp_cmd_LIST(ftp_env_t *env, const char *arg);
+int ftp_cmd_MDTM(ftp_env_t *env, const char *arg);
+int ftp_cmd_MFF(ftp_env_t *env, const char *arg);
+int ftp_cmd_MFMT(ftp_env_t *env, const char *arg);
+int ftp_cmd_MKD(ftp_env_t *env, const char *arg);
+int ftp_cmd_MLSD(ftp_env_t *env, const char *arg);
+int ftp_cmd_MLST(ftp_env_t *env, const char *arg);
+int ftp_cmd_NLST(ftp_env_t *env, const char *arg);
+int ftp_cmd_NOOP(ftp_env_t *env, const char *arg);
+int ftp_cmd_OPTS(ftp_env_t *env, const char *arg);
+int ftp_cmd_PASS(ftp_env_t *env, const char *arg);
+int ftp_cmd_PASV(ftp_env_t *env, const char *arg);
+int ftp_cmd_PORT(ftp_env_t *env, const char *arg);
+int ftp_cmd_PWD(ftp_env_t *env, const char *arg);
+int ftp_cmd_QUIT(ftp_env_t *env, const char *arg);
+int ftp_cmd_REST(ftp_env_t *env, const char *arg);
+int ftp_cmd_RETR(ftp_env_t *env, const char *arg);
+int ftp_cmd_RMD(ftp_env_t *env, const char *arg);
+int ftp_cmd_RNFR(ftp_env_t *env, const char *arg);
+int ftp_cmd_RNTO(ftp_env_t *env, const char *arg);
+int ftp_cmd_SIZE(ftp_env_t *env, const char *arg);
+int ftp_cmd_STOR(ftp_env_t *env, const char *arg);
+int ftp_cmd_SYST(ftp_env_t *env, const char *arg);
+int ftp_cmd_TYPE(ftp_env_t *env, const char *arg);
+int ftp_cmd_USER(ftp_env_t *env, const char *arg);
+
+int ftp_cmd_KILL(ftp_env_t *env, const char *arg);
+int ftp_cmd_MTRW(ftp_env_t *env, const char *arg);
+int ftp_cmd_CHMOD(ftp_env_t *env, const char *arg);
+int ftp_cmd_SELF(ftp_env_t *env, const char *arg);
+
+int ftp_cmd_unavailable(ftp_env_t *env, const char *arg);
+int ftp_cmd_unknown(ftp_env_t *env, const char *arg);
+
+int ftp_active_printf(ftp_env_t *env, const char *fmt, ...);
+
+void ftp_abspath(ftp_env_t *env, char *abspath, const char *path);
+
+int ftp_perror(ftp_env_t *env);
+
+int ftp_data_open(ftp_env_t *env);
+
+int ftp_data_close(ftp_env_t *env);

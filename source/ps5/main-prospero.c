@@ -1,0 +1,133 @@
+/* Copyright (C) 2025 John Törnblom
+   Copyright (C) 2026 ItsJokerZz
+
+This program is free software; you can redistribute it and/or modify it
+under the terms of the GNU General Public License as published by the
+Free Software Foundation; either version 3, or (at your option) any
+later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program; see the file COPYING. If not, see
+<http://www.gnu.org/licenses/>.  */
+
+#include <errno.h>
+#include <signal.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
+
+#include <sys/sysctl.h>
+#include <sys/syscall.h>
+
+#include <ps5/kernel.h>
+
+#include "srv.h"
+#include "log.h"
+#include "io.h"
+
+static pid_t
+find_pid(const char *name) {
+  int mib[4] = { 1, 14, 8, 0 };
+  pid_t mypid = getpid();
+  pid_t pid = -1;
+  size_t buf_size;
+  uint8_t *buf;
+
+  if(sysctl(mib, 4, 0, &buf_size, 0, 0)) {
+    LOG_PERROR("sysctl");
+    return -1;
+  }
+
+  buf_size += buf_size / 4;
+  if(!(buf = mem_alloc(buf_size))) {
+    LOG_PERROR("mmap");
+    return -1;
+  }
+
+  if(sysctl(mib, 4, buf, &buf_size, 0, 0)) {
+    LOG_PERROR("sysctl");
+    mem_free(buf);
+    return -1;
+  }
+
+  for(uint8_t *ptr = buf; ptr < (buf + buf_size);) {
+    int ki_structsize = *(int *)ptr;
+    if(ki_structsize <= 0) {
+      break;
+    }
+
+    pid_t ki_pid = *(pid_t *)&ptr[72];
+    char *ki_tdname = (char *)&ptr[447];
+
+    ptr += ki_structsize;
+    if(!strcmp(name, ki_tdname) && ki_pid != mypid) {
+      pid = ki_pid;
+    }
+  }
+
+  mem_free(buf);
+
+  return pid;
+}
+
+int
+main(int argc, char *argv[]) {
+  uint16_t port = 2121;
+  int notify_user = 1;
+  pid_t pid;
+  char c;
+
+  syscall(SYS_thr_set_name, -1, "ftpsrv.elf");
+
+  while((c = getopt(argc, argv, "p:qh")) != (char)-1) {
+    switch(c) {
+      case 'p':
+        port = atoi(optarg);
+        break;
+
+      case 'q':
+        notify_user = 0;
+        break;
+
+      case 'h':
+      default:
+        printf("usage: %s [-p PORT] [-q]\n", argv[0]);
+        puts("");
+        printf("options:");
+        printf("    -p PORT    Bind the socket server to the given PORT "
+               "(default: 2121)\n");
+        printf("    -q         Do not send an on-screen notification when the "
+               "server starts\n");
+        return EXIT_FAILURE;
+    }
+  }
+
+  while((pid = find_pid("ftpsrv.elf")) > 0) {
+    if(kill(pid, SIGKILL)) {
+      LOG_PERROR("kill");
+      return EXIT_FAILURE;
+    }
+    sleep(1);
+  }
+
+  signal(SIGPIPE, SIG_IGN);
+
+  pid = getpid();
+  if(kernel_set_ucred_authid(pid, 0x4801000000000013L)) {
+    LOG_PUTS("Unable to change AuthID");
+    return EXIT_FAILURE;
+  }
+
+  while(1) {
+    ftp_serve(port, notify_user);
+    notify_user = 0;
+    sleep(3);
+  }
+
+  return EXIT_SUCCESS;
+}

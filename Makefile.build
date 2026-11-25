@@ -1,0 +1,21 @@
+BUILD_DIR := build/$(PLATFORM)
+OBJ_DIR := $(BUILD_DIR)/objects
+OBJECTS := $(addprefix $(OBJ_DIR)/,$(notdir $(SOURCE:.c=.o)))
+VPATH := source/common:source/$(PLATFORM)
+
+.PHONY: all clean test install format
+all: $(TARGETS)
+
+$(OBJ_DIR)/%.o: %.c
+	@mkdir -p $(dir $@)
+	$(CC) $(CFLAGS) -c $< -o $@
+
+$(PAYLOAD): $(OBJECTS)
+	@mkdir -p $(dir $@)
+	$(CC) $(LDFLAGS) -o $@ $^ $(LDLIBS)
+
+clean:
+	rm -rf $(BUILD_DIR)
+
+format:
+	clang-format -i $(filter-out %/sha256.c %/sha256.h,$(wildcard source/*/*.c headers/*.h))

@@ -1,0 +1,36 @@
+PLATFORM := ps5
+PS5_HOST ?= ps5
+PS5_PORT ?= 9021
+
+ifndef PS5_PAYLOAD_SDK
+$(error PS5_PAYLOAD_SDK is undefined)
+endif
+include $(PS5_PAYLOAD_SDK)/toolchain/prospero.mk
+
+PAYLOAD := build/ps5/ftpsrv-ps5.elf
+INSTALLER := build/ps5/ftpsrv-ps5-install.elf
+TARGETS := $(PAYLOAD) $(INSTALLER)
+VERSION_TAG := $(shell git describe --abbrev=6 --dirty --always --tags)
+TITLE_ID := BREW10001
+CFLAGS := -Wall -Werror -Iheaders -DVERSION_TAG=\"$(VERSION_TAG)\"
+CFLAGS += -DTITLE_ID=\"$(TITLE_ID)\"
+SOURCE := cmd.c io.c io-freebsd.c notify.c self.c sha256.c srv.c
+SOURCE += cmd-prospero.c main-prospero.c self-prospero.c
+ASSETS := assets/param.json assets/icon0.png assets/websrv.html
+ASSETS += assets/xterm.min.js assets/xterm.min.css
+
+include Makefile.build
+
+$(OBJ_DIR)/install-ps5.o: source/ps5/install-ps5.c $(PAYLOAD) $(ASSETS)
+	@mkdir -p $(dir $@)
+	$(CC) $(CFLAGS) -c $< -o $@
+
+$(INSTALLER): $(OBJ_DIR)/install-ps5.o
+	@mkdir -p $(dir $@)
+	$(CC) $(LDFLAGS) -o $@ $^ -lSceIpmi -lSceAppInstUtil
+
+install: $(INSTALLER)
+	$(PS5_DEPLOY) -h $(PS5_HOST) -p $(PS5_PORT) $<
+
+test: $(PAYLOAD)
+	$(PS5_DEPLOY) -h $(PS5_HOST) -p $(PS5_PORT) $<
